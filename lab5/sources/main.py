@@ -1,48 +1,65 @@
-import telebot
-from telebot import types
-import functions, config
-
-bot = telebot.TeleBot(config.token, parse_mode='MARKDOWN')
-
-@bot.message_handler(commands=['start'])
-def handle_start_help(message):
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = config.buttons['start_menu']
-    keyboard.add(*buttons)
-    bot.send_message(message.chat.id, 'Привет. Я подскажу расписание.', reply_markup=keyboard)
-
-@bot.message_handler(content_types='text')
-def message_reply(message):
-    dataset = {'day': None, 'odd': None}
-    if message.text=="Сегодня":
-        bot.send_message(message.chat.id, functions.get_rasp(*functions.now_data()))
-    elif message.text=="Завтра":
-        bot.send_message(message.chat.id, functions.get_rasp(*functions.now_data(1)))
-    elif message.text=="Выбрать день":
-        keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-        buttons = config.buttons['odd_menu']
-        keyboard.add(*buttons)
-        bot.send_message(message.chat.id, 'Выбери неделю', reply_markup=keyboard)
-        m = bot.register_next_step_handler(message, lambda m: select_day(m, dataset))
-
-def select_day(message, dataset):
-    if message.text == "Чётная":
-        dataset['odd'] = True
-    elif message.text == "Нечётная":
-        dataset['odd'] = False
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = config.buttons['day_menu']
-    keyboard.add(*buttons)
-    bot.send_message(message.chat.id, 'Выбери день недели', reply_markup=keyboard)
-    m = bot.register_next_step_handler(message, lambda m: return_rasp(m, dataset))
-
-def return_rasp(message, dataset):
-    dataset['day'] = config.buttons['day_menu'].index(message.text)
-    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    buttons = config.buttons['start_menu']
-    keyboard.add(*buttons)
-    bot.send_message(message.chat.id, functions.get_rasp(dataset['odd'], dataset['day']), reply_markup=keyboard)
-
-if __name__ == "__main__":
-    bot.infinity_polling()
+import sys
+import sympy
+from PyQt5.QtWidgets import QApplication, QWidget, QGridLayout, QPushButton, QLineEdit
+ 
+class Window(QWidget):
+    def __init__(self):
+        super(Window, self).__init__()
+        grid = QGridLayout()
+        self.calcText = QLineEdit()
+        self.setLayout(grid)
+        grid.addWidget(self.calcText, 0, 0, 1, 4)
+        names = ['Cls', 'Bck', '(', ')',
+                 '7', '8', '9', '/',
+                 '4', '5', '6', '*',
+                 '1', '2', '3', '-',
+                 '0', '.', '=', '+']
+        positions = [(i+1,j) for i in range(6) for j in range(4)]
+        buttons = []
+        for position, name in zip(positions, names):
+            button = QPushButton(name)
+            buttons.append(button)
+            grid.addWidget(button, *position)
+ 
+        for keyindx in range(0, len(names)):
+            buttons[keyindx].clicked.connect(lambda ch, text=names[keyindx]: self.butonact(text))
+ 
+        self.move(300, 150)
+        self.setWindowTitle('Calculator')
+        self.show()
     
+    def make_calculate(self):
+        try:
+            return eval(str(sympy.sympify(self.calcText.text(), evaluate=True)))
+        except Exception as e:
+            print(e)
+            return 'ERROR'
+ 
+    def butonact(self, param):
+        nowLine = self.calcText.text()
+        if param in ['7', '8', '9', '/',
+                     '4', '5', '6', '*',
+                     '1', '2', '3', '-',
+                     '0', '.', '+', '(', ')']:
+            if len(nowLine) > 0:
+                if nowLine[-1] in ['/', '*', '-', '.', '+'] and param in ['/', '*', '-', '.', '+', '=']:
+                    pass
+                else: 
+                    self.calcText.setText(nowLine + str(param))
+            else: 
+                self.calcText.setText(nowLine + str(param))
+        elif param in ['Cls', 'Bck', '=']:
+            if param == 'Cls':
+                self.calcText.setText('')
+            elif param == 'Bck':
+                if len(nowLine) > 0:
+                    self.calcText.setText(nowLine[:-1])
+            elif param == '=':
+                res = str(self.make_calculate())
+                self.calcText.setText(res)
+ 
+    
+app = QApplication(sys.argv)
+win = Window()
+win.show() 
+sys.exit(app.exec())
